@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Size
 import org.tensorflow.lite.Interpreter
+import org.tensorflow.lite.gpu.CompatibilityList
+import org.tensorflow.lite.gpu.GpuDelegate
 import org.tensorflow.lite.support.common.FileUtil
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
@@ -27,7 +29,7 @@ class Classifier(private var context: Context, private val modelName: String) {
     private var isInitialized = false
 
     fun init() {
-        model = createMultiThreadModel(context, modelName, 3)
+        model = createGPUModel(context, modelName)
         initModelShape()
         labels.addAll(FileUtil.loadLabels(context, LABEL_FILE))
         isInitialized = true
@@ -43,6 +45,31 @@ class Classifier(private var context: Context, private val modelName: String) {
     private fun createMultiThreadInterpreter(context: Context, modelName: String, threadSize: Int): Interpreter {
         val options = Interpreter.Options().apply {
             setNumThreads(threadSize)
+        }
+        val model = FileUtil.loadMappedFile(context, modelName).apply {
+            order(ByteOrder.nativeOrder())
+        }
+        return Interpreter(model, options)
+    }
+
+    private fun createGPUModel(context: Context, modelName: String): Model {
+        val compatList = CompatibilityList()
+        val optionsBuilder = Model.Options.Builder().apply {
+            if (compatList.isDelegateSupportedOnThisDevice) {
+                setDevice(Model.Device.GPU)
+            }
+        }
+        return Model.createModel(context, modelName, optionsBuilder.build())
+    }
+
+    private fun createGPUInterpreter(context: Context, modelName: String): Interpreter {
+        val compatList = CompatibilityList()
+        val options = Interpreter.Options().apply {
+            if (compatList.isDelegateSupportedOnThisDevice) {
+                val delegateOptions = compatList.bestOptionsForThisDevice
+                val gpuDelegate = GpuDelegate(delegateOptions)
+                addDelegate(gpuDelegate)
+            }
         }
         val model = FileUtil.loadMappedFile(context, modelName).apply {
             order(ByteOrder.nativeOrder())
