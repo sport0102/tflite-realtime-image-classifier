@@ -8,10 +8,7 @@ import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.media.ImageReader
-import android.os.Build
-import android.os.Bundle
-import android.os.Handler
-import android.os.HandlerThread
+import android.os.*
 import android.util.Size
 import android.view.Surface
 import android.view.WindowManager
@@ -177,10 +174,18 @@ class MainActivity : AppCompatActivity() {
 
         handler?.post {
             if (::classifier.isInitialized && classifier.isInitialized()) {
+                val startTime = SystemClock.uptimeMillis()
                 val output = classifier.classify(rgbFrameBitmap!!, sensorOrientation)
+                val elapsedTime = SystemClock.uptimeMillis() - startTime
                 runOnUiThread {
                     binding.textResult.text =
-                        String.format(Locale.ENGLISH, "class : %s, prob : %.2f%%", output.first, output.second * 100)
+                        String.format(
+                            Locale.ENGLISH,
+                            "class : %s\nprob : %.2f%%\ntime : %dms",
+                            output.first,
+                            output.second * 100,
+                            elapsedTime
+                        )
                 }
             }
             image.close()
