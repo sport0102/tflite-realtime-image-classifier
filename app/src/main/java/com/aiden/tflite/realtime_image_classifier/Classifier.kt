@@ -2,10 +2,12 @@ package com.aiden.tflite.realtime_image_classifier
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.os.Build
 import android.util.Size
 import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.gpu.CompatibilityList
 import org.tensorflow.lite.gpu.GpuDelegate
+import org.tensorflow.lite.nnapi.NnApiDelegate
 import org.tensorflow.lite.support.common.FileUtil
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
@@ -69,6 +71,28 @@ class Classifier(private var context: Context, private val modelName: String) {
                 val delegateOptions = compatList.bestOptionsForThisDevice
                 val gpuDelegate = GpuDelegate(delegateOptions)
                 addDelegate(gpuDelegate)
+            }
+        }
+        val model = FileUtil.loadMappedFile(context, modelName).apply {
+            order(ByteOrder.nativeOrder())
+        }
+        return Interpreter(model, options)
+    }
+
+    private fun createNNAPIModel(context: Context, modelName: String): Model {
+        val optionsBuilder = Model.Options.Builder().apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                setDevice(Model.Device.NNAPI)
+            }
+        }
+        return Model.createModel(context, modelName, optionsBuilder.build())
+    }
+
+    private fun createNNAPIInterpreter(context: Context, modelName: String): Interpreter {
+        val options = Interpreter.Options().apply {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val nnApiDelegate = NnApiDelegate()
+                addDelegate(nnApiDelegate)
             }
         }
         val model = FileUtil.loadMappedFile(context, modelName).apply {
