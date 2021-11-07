@@ -3,6 +3,7 @@ package com.aiden.tflite.realtime_image_classifier
 import android.content.Context
 import android.graphics.Bitmap
 import android.util.Size
+import org.tensorflow.lite.Interpreter
 import org.tensorflow.lite.support.common.FileUtil
 import org.tensorflow.lite.support.common.ops.NormalizeOp
 import org.tensorflow.lite.support.image.ImageProcessor
@@ -13,6 +14,7 @@ import org.tensorflow.lite.support.image.ops.Rot90Op
 import org.tensorflow.lite.support.label.TensorLabel
 import org.tensorflow.lite.support.model.Model
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
+import java.nio.ByteOrder
 
 class Classifier(private var context: Context, private val modelName: String) {
     private lateinit var model: Model
@@ -25,10 +27,27 @@ class Classifier(private var context: Context, private val modelName: String) {
     private var isInitialized = false
 
     fun init() {
-        model = Model.createModel(context, modelName)
+        model = createMultiThreadModel(context, modelName, 3)
         initModelShape()
         labels.addAll(FileUtil.loadLabels(context, LABEL_FILE))
         isInitialized = true
+    }
+
+    private fun createMultiThreadModel(context: Context, modelName: String, threadSize: Int): Model {
+        val optionBuilder = Model.Options.Builder().apply {
+            setNumThreads(threadSize)
+        }
+        return Model.createModel(context, modelName, optionBuilder.build())
+    }
+
+    private fun createMultiThreadInterpreter(context: Context, modelName: String, threadSize: Int): Interpreter {
+        val options = Interpreter.Options().apply {
+            setNumThreads(threadSize)
+        }
+        val model = FileUtil.loadMappedFile(context, modelName).apply {
+            order(ByteOrder.nativeOrder())
+        }
+        return Interpreter(model, options)
     }
 
     private fun initModelShape() {
